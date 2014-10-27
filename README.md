@@ -171,3 +171,103 @@ In order to make this happen, `redis-shield` requires you to adhere to a simple 
 Additionally, every Lua script you care to run in the server _must_ be written to an actual file (ie. if you're merely caling `EVAL` with a constant string, just place that string in a file and apply the convention above). This makes `redis-shield` incompatible with any application that builds its scripts _on-the-fly_, but I find that to be a questionable practice anyway (that is, in the general case, I'm sure there are very valid and interesting reasons to do that every now and then).
 
 Finally, you'll need to implement an abstraction layer of sorts, mapping script names (ie. file names) to `SHA1` hashes and calling that instead of just throwing a command at the Redis connection.
+
+### Worked Example
+
+Suppose you have the following Lua script (`zset2set.lua`):
+
+```lua
+--[[
+
+Time complexity: O(N + M) where N is the size of dest (might be 0), and M the size of source
+Space complexity: O(M) where is the size of source
+
+Convert a ZSET into a SET of its members alone (ie. discard scores).
+Note that dest and source may be the same keys, this has the effect of removing scores from a ZSET.
+
+USAGE: ZSET2SET dest source
+
+RETURN: number of elements in dest
+
+]]--
+
+-- initialize counter
+local i = 0
+
+-- get the source ZSET
+local src = redis.call('zrange', KEYS[2], 0, -1)
+
+-- clean up destination SET
+redis.call('del', KEYS[1])
+-- look for each element in the source
+for _, v in pairs(src) do
+  -- increment the count
+  i = i + 1
+  -- add it
+  redis.call('sadd', KEYS[1], v)
+end
+
+-- return the count
+return i
+```
+
+This will convert a `ZSET` into the `SET` of its members.
+
+Now, lets choose a _pattern_. We can use whatever we want, but let's stick with the default (ie. `__%s__`) one for now. We'll need to rename every appearence of a Redis command to match:
+
+```lua
+--[[
+
+Time complexity: O(N + M) where N is the size of dest (might be 0), and M the size of source
+Space complexity: O(M) where is the size of source
+
+Convert a ZSET into a SET of its members alone (ie. discard scores).
+Note that dest and source may be the same keys, this has the effect of removing scores from a ZSET.
+
+USAGE: ZSET2SET dest source
+
+RETURN: number of elements in dest
+
+]]--
+
+-- initialize counter
+local i = 0
+
+-- get the source ZSET
+local src = redis.call('__ZRANGE__', KEYS[2], 0, -1)
+
+-- clean up destination SET
+redis.call('__DEL__', KEYS[1])
+-- look for each element in the source
+for _, v in pairs(src) do
+  -- increment the count
+  i = i + 1
+  -- add it
+  redis.call('__SADD__', KEYS[1], v)
+end
+
+-- return the count
+return i
+```
+
+You're done! Now running `redis-shield` will launch the Redis server, rename _all_ the commands (except for `EVALSHA`), apply the renaming to our file, and load it into the script cache, returning something like:
+
+```
+da39a3ee5e6b4b0d3255bfef95601890afd80709 /path/to/zset2set.lua
+```
+
+(that's the `SHA1` of the empty string btw ;) ).
+
+Now it's up to you to pick that output up and perform a mapping like:
+
+Script|Hash
+-----------|----
+`zset2set`|`da39a3ee5e6b4b0d3255bfef95601890afd80709`
+
+so that your application can make use of it using `EVALSHA`.
+
+Simple, right? :)
+
+## Rationale
+
+TODO
