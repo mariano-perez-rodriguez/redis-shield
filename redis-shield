@@ -1,0 +1,419 @@
+#! /bin/bash
+
+# Current version
+#
+# @var string
+VERSION='0.1'
+
+# Executable name
+#
+# @var string
+EXECNAME='redis-shield'
+
+# Show basic help
+#
+# @return string
+showHelp() {
+  echo -n "Usage: ${EXECNAME} OPTION... [FILE]...
+Apply command renaming to each Lua FILE, apply rename-command directives
+to the given Redis server, and load the renamed scripts; return a list of
+space separated hash / FILE pairs.
+
+Mandatory options:
+  -s SERVER-SCRIPT   use the given script as the server
+  -c CONFIG          use the given file as base configuration
+  -e CLI-SCRIPT      use the given script as the cli interface
+
+Additional options:
+  -m MAP-FILE   write the hash / FILE mapping to the given file
+                  instead of stdout
+  -n            use newlines as terminators for hash / FILE mapping
+  -z            use nulls as terminators for hash / FILE mapping
+  -x COMMAND    exclude COMMAND from renaming (this option may be given
+                  multiple times)
+  -d COMMAND    disable COMMAND, ie. rename to '' (this option may be given
+                  multiple times)
+  -p PATTERN    use PATTERN as the replacement token pattern, the default
+                  pattern is '__%s__'; this must be a printf-friendly
+                  format string with a single '%s' occurence and no other
+                  format specifier; commands are always given in uppercase
+  -b BITS       bit length of the rename tags (will be rounded up to a
+                  multiple of 4), defaults to 1024
+
+  --            signal the end of command line options
+
+  -h            display this help and exit
+  -v            output version information and exit
+
+The SERVER-SCRIPT is any script able to start a Redis server being given
+a configuration file, to be read from stdin if '-' is specified instead.
+
+The CLI-SCRIPT is any script able to connect to the Redis server,
+recognizing the '-p', '-s', and '-a' options for specifying port, socket,
+and authentication; additionally, it should support the '-x' switch
+instructing the script to read its last argument from stdin. Note that
+redis-cli fulfills the requirements.
+"
+}
+
+# Show version information
+#
+# @return string
+showVersion() {
+  echo -n "${EXECNAME} ${VERSION}
+Copyright (C) 2014 Mariano Pérez Rodríguez.
+License AGPLv3+: GNU AGPL version 3 or later <http://gnu.org/licenses/agpl.html>.
+This is free software: you are free to change and redistribute it.
+There is NO WARRANTY, to the extent permitted by law.
+
+Written by Mariano Pérez Rodríguez <mariano.perez.rodriguez@gmail.com>.
+"
+}
+
+# Trim whitespace from the ends of the given string
+#
+# @param string  String to trim
+# @return string
+trim() {
+  local var="$1"
+  var="${var#"${var%%[![:space:]]*}"}"
+  var="${var%"${var##*[![:space:]]}"}"
+  echo -n "${var}"
+}
+
+# get a random hex string of the given length
+#
+# @param int  Length
+# @return string
+getRandHex() {
+  local var="$(tr -cd '[:xdigit:]' < /dev/urandom | head -c$(( $1 )))"
+  echo -n "${var,,}"
+}
+
+
+# Pattern to use for replacement (printf)
+#
+# @var string
+pattern='__%s__'
+
+# Redis server script (must accept a config file from stdin when provided with a "-" argument)
+#
+# @var string
+server=''
+
+# Redis command line script (must accept the redis-cli "-x" option, and otherwise behave like it)
+#
+# @var string
+cli=''
+
+# Redis base config to use
+#
+# @var string
+config=''
+
+# Script mapping file
+#
+# @var string
+scriptMap=''
+
+# Terminator charachter for script map
+#
+# @var string
+terminator="\n"
+
+# Commands to replace
+#
+# NOTE: USE LOWERCASE ONLY HERE!!!
+#
+# @var array
+tokens=(
+  # keys
+  'del' 'dump' 'exists' 'expire' 'expireat' 'keys' 'migrate' 'move' 'object' 'persist' 'pexpire' 'pexpireat' 'pttl' 'randomkey' 'rename' 'renamenx' 'restore' 'sort' 'ttl' 'type' 'scan'
+  # strings
+  'append' 'bitcount' 'bitop' 'bitpos' 'decr' 'decrby' 'get' 'getbit' 'getrange' 'getset' 'incr' 'incrby' 'incrbyfloat' 'mget' 'mset' 'msetnx' 'psetex' 'set' 'setbit' 'setex' 'setnx' 'setrange' 'strlen'
+  # hashes
+  'hdel' 'hexists' 'hget' 'hgetall' 'hincrby' 'hincrbyfloat' 'hkeys' 'hlen' 'hmget' 'hmset' 'hset' 'hsetnx' 'hvals' 'hscan'
+  # lists
+  'blpop' 'brpop' 'brpoplpush' 'lindex' 'linsert' 'llen' 'lpop' 'lpush' 'lpushx' 'lrange' 'lrem' 'lset' 'ltrim' 'rpop' 'rpoplpush' 'rpush' 'rpushx'
+  # sets
+  'sadd' 'scard' 'sdiff' 'sdiffstore' 'sinter' 'sinterstore' 'sismember' 'smembers' 'smove' 'spop' 'srandmember' 'srem' 'sunion' 'sunionstore' 'sscan'
+  # sorted sets
+  'zadd' 'zcard' 'zcount' 'zincrby' 'zinterstore' 'zlexcount' 'zrange' 'zrangebylex' 'zrevrangebylex' 'zrangebyscore' 'zrank' 'zrem' 'zremrangebylex' 'zremrangebyrank' 'zremrangebyscore' 'zrevrange' 'zrevrangebyscore' 'zrevrank' 'zscore' 'zunionstore' 'zscan'
+  # hyperloglog
+  'pfadd' 'pfcount' 'pfmerge'
+  # pubsub
+  'psubscribe' 'pubsub' 'publish' 'punsubscribe' 'subscribe' 'unsubscribe'
+  # transactions
+  'discard' 'exec' 'multi' 'unwatch' 'watch'
+  # scripting
+  'eval' 'evalsha' 'script'
+  # connection
+  'auth' 'echo' 'ping' 'select' # 'quit' is not a renameable command, go figure
+  # server
+  'bgrewriteaof' 'bgsave' 'client' 'cluster' 'command' 'config' 'dbsize' 'flushall' 'flushdb' 'info' 'lastsave' 'monitor' 'role' 'save' 'shutdown' 'slaveof' 'slowlog' 'sync' 'time' 'debug'
+)
+
+# Commands to exclude from replacement
+#
+# NOTE: EVALSHA will always be excluded, otherwise we can't call any script at all
+#
+# @var array
+exclude=('evalsha')
+
+# Commands to disable (ie. rename to '')
+#
+# @var array
+disable=()
+
+# Length to use for random strings
+#
+# @var int
+(( randLength = 1024 ))
+
+
+# Options errors string
+#
+# @param string
+optionErrors=''
+
+# parse command line options
+while getopts ':s:c:e:m:p:x:d:b:znhv-' opt; do
+  case "${opt}" in
+    '-') break ;;
+    #
+    's') server="$(trim "${OPTARG} ")" ;;
+    'c') config="$(trim "${OPTARG} ")" ;;
+    'e') cli="$(trim "${OPTARG} ")" ;;
+    #
+    'm') scriptMap="$(trim "${OPTARG} ")" ;;
+    #
+    'p') pattern="$(trim "${OPTARG} ")";;
+    #
+    'x') exclude+=("$(trim "${OPTARG,,} ")") ;;
+    'd') disable+=("$(trim "${OPTARG,,} ")") ;;
+    #
+    'b') (( randLength = "${OPTARG}" )) ;;
+    #
+    'z') terminator="\0" ;;
+    'n') terminator="\n" ;;
+    #
+    'h') showHelp; exit 0;;
+    'v') showVersion; exit 0;;
+    #
+    '?') optionErrors+="${EXECNAME}: ivalid option -- '${OPTARG}'\n" ;;
+    ':') optionErrors+="${EXECNAME}: option '-${OPTARG}' requires an argument\n" ;;
+  esac
+done
+# shift off the options and optional --
+shift "$(( OPTIND - 1 ))"
+
+# check validity of '-s' argument
+if [[ "${server}" == '' ]]; then
+  optionErrors+="${EXECNAME}: error -- no SERVER-SCRIPT specified\n"
+else
+  server="$(realpath -e -- "${server}" 2> /dev/null)"
+  if [[ "${server}" == '' ]]; then
+    optionErrors+="${EXECNAME}: error -- specified SERVER-SCRIPT doesn't exist\n"
+  fi
+fi
+
+# check validity of '-c' argument
+if [[ "${config}" == '' ]]; then
+  optionErrors+="${EXECNAME}: error -- no CONFIG file specified\n"
+else
+  config="$(realpath -e -- "${config}" 2> /dev/null)"
+  if [[ "${config}" == '' ]]; then
+    optionErrors+="${EXECNAME}: error -- specified CONFIG file doesn't exist\n"
+  fi
+fi
+
+# check validity of '-e' argument
+if [[ "${cli}" == '' ]]; then
+  optionErrors+="${EXECNAME}: error -- no CLI-SCRIPT specified\n"
+else
+  cli="$(realpath -e -- "${cli}" 2> /dev/null)"
+  if [[ "${cli}" == '' ]]; then
+    optionErrors+="${EXECNAME}: error -- specified CLI-SCRIPT doesn't exist\n"
+  fi
+fi
+
+# check validity of '-m' argument, if given
+if [[ "${scriptMap}" != '' ]]; then
+  scriptMap="$(realpath -- "${scriptMap}" 2> /dev/null)"
+  if [[ "${scriptMap}" == '' ]]; then
+    optionErrors+="${EXECNAME}: error -- path to MAP-FILE doesn't exist\n"
+  fi
+fi
+
+# check validity of '-p' argument
+testPattern="${pattern//%%/}"
+if [[ "${testPattern/\%s/}" == *%* ]]; then
+  optionErrors+="${EXECNAME}: error -- invalid pattern '${pattern}'\n"
+fi
+
+# check validity of '-x' arguments
+for excl in "${exclude[@]}"; do
+  if [[ "${excl}" != "${excl//[^[:alpha:]]/}" ]]; then
+    optionErrors+="${EXECNAME}: error -- invalid excluded command '${excl}' contains non-alphabetic characters\n"
+  elif [[ ! " ${tokens[@]} " =~ " ${excl} " ]]; then
+    optionErrors+="${EXECNAME}: error -- non-existent excluded command '${excl}'\n"
+  fi
+done
+
+# check validity of '-d' arguments
+for dis in "${disable[@]}"; do
+  if [[ "${dis}" != "${dis//[^[:alpha:]]/}" ]]; then
+    optionErrors+="${EXECNAME}: error -- invalid disabled command '${dis}' contains non-alphabetic characters\n"
+  elif [[ "${dis}" == 'ping' || "${dis}" == 'script' || "${dis}" == 'evalsha' ]]; then
+    optionErrors+="${EXECNAME}: error -- cannot disable required command '${dis}'\n"
+  elif [[ ! " ${tokens[@]} " =~ " ${dis} " ]]; then
+    optionErrors+="${EXECNAME}: error -- non-existent disabled command '${dis}'\n"
+  elif [[ " ${exclude[@]} " =~ " ${dis} " ]]; then
+    optionErrors+="${EXECNAME}: error -- cannot both exclude and disable the command '${dis}'\n"
+  fi
+done
+
+# check validity of '-b' argument, advance to next multiple of 4 if needed
+if (( randLength <= 0 )); then
+  optionErrors+="${EXECNAME}: error -- BITS must be non-negative"
+else
+  (( randLength += 3 - ((randLength - 1) % 4) ))
+  (( randLength /= 4 ))
+fi
+
+# show message if invalid options found
+if [[ "${optionErrors}" != '' ]]; then
+  echo -ne "${optionErrors}Try '${EXECNAME} -h' for more information.\n"
+  exit 1
+fi
+
+# Redis' port, as per config
+#
+# @var int
+port="$(trim "$(grep -ioe'^[[:space:]]*port[[:space:]]\+[[:digit:]]\+[[:space:]]*$' "${config}")" | cut -d\  -f2)"
+port="$(trim "${port#port}")"
+(( port = port ))
+
+# Redis' socket, as per config
+#
+# @var string
+socket="$(trim "$(grep -ioe'^[[:space:]]*unixsocket[[:space:]]\+[[:graph:]]\+[[:space:]]*$' "${config}")" | cut -d\  -f2)"
+socket="$(trim "${socket#unixsocket}")"
+
+# Redis' password, as per config
+#
+# @var string
+password="$(trim "$(grep -ioe'^[[:space:]]*requirepass[[:space:]]\+[[:graph:]]\+[[:space:]]*$' "${config}")" | cut -d\  -f2-)"
+password="$(trim "${password#requirepass}")"
+
+
+# Socket options for cli script
+#
+# @var string
+socketCmd=''
+
+# Port options for cli script
+#
+# @var string
+portCmd=''
+
+# Password options for cli script
+#
+# @var string
+passwordCmd=''
+
+# build socket / port options
+if [[ "${socket}" != '' ]]; then
+  socketCmd="-s '${socket}'"
+else
+  if (( port != 0 )); then
+    portCmd="-p $(( port ))"
+  fi
+fi
+# build password options
+if [[ "${password}" != '' ]]; then
+  passwordCmd="-a '${password}'"
+fi
+
+# Cache the translation of SCRIPT
+#
+# @var string
+tScript=''
+
+# Cache the translation of PING
+#
+# @var string
+tPing=''
+
+# Sed command replacement expression
+#
+# @var string
+sedRepExpr=''
+
+# Redis config rename-command expressions
+#
+# @var string
+redisRenameExpr=''
+
+# build command renaming expressions
+for token in "${tokens[@]}"; do
+  if [[ ! " ${exclude[@]} " =~ " ${token} " ]]; then
+    if [[ ! " ${disable[@]} " =~ " ${token} " ]]; then
+      # get random string
+      rand="$(getRandHex $(( randLength )))"
+    else
+      # disabled command - empty string
+      rand="''"
+    fi
+    # build rename-command expression
+    redisRenameExpr+="rename-command ${token} ${rand}\n"
+  else
+    # excluded from renaming - keep name
+    rand="${token}"
+  fi
+  # build sed replacement expression
+  sedRepExpr+="s/$(printf "${pattern}" "${token^^}")/${rand}/g;"
+  # cache SCRIPT value
+  if [[ "${token}" == 'script' ]]; then
+    tScript="${rand}"
+  fi
+  # cache PING value
+  if [[ "${token}" == 'ping' ]]; then
+    tPing="${rand}"
+  fi
+done
+
+# patch up config file and start server
+echo -e "${redisRenameExpr}" | cat "${config}" - | "${server}" -  2> /dev/null 1>&2 &
+
+# timeout to wait for the server to spin up
+#
+# @var int
+(( timeout = 5 ))
+
+# waiting start time
+#
+# @var int
+(( waitStart = "$(printf "%(%s)T")" ))
+
+# wait for the server to come online
+while ! ${cli} ${socketCmd} ${portCmd} ${passwordCmd} "${tPing}" 2> /dev/null 1>&2; do
+  sleep 1
+  if (( "$(printf "%(%s)T")" - waitStart > timeout )); then
+    break
+  fi
+done
+
+# clean up script map file
+if [[ "${scriptMap}" != '' ]]; then
+  echo '' > "${scriptMap}"
+fi
+# iterate through each remaining argument
+for lua in "$@"; do
+  hash="$(sed -e "${sedRepExpr}" < "${lua}" | ${cli} ${socketCmd} ${portCmd} ${passwordCmd} -x "${tScript}" load)"
+  if [[ "${scriptMap}" != '' ]]; then
+    echo -ne "${hash} $(realpath -e ${lua})${terminator}" >> "${scriptMap}"
+  else
+    echo -ne "${hash} $(realpath -e ${lua})${terminator}"
+  fi
+done
