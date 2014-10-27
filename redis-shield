@@ -39,6 +39,8 @@ Additional options:
                   format specifier; commands are always given in uppercase
   -b BITS       bit length of the rename tags (will be rounded up to a
                   multiple of 4), defaults to 1024
+  -t TIMEOUT    time in seconds to wait for server availability (defaults
+                  to 5)
 
   --            signal the end of command line options
 
@@ -170,6 +172,11 @@ disable=()
 # @var int
 (( randLength = 1024 ))
 
+# timeout to wait for the server to spin up
+#
+# @var int
+(( timeout = 5 ))
+
 
 # Options errors string
 #
@@ -177,7 +184,7 @@ disable=()
 optionErrors=''
 
 # parse command line options
-while getopts ':s:c:e:m:p:x:d:b:znhv-' opt; do
+while getopts ':s:c:e:m:p:x:d:b:t:znhv-' opt; do
   case "${opt}" in
     '-') break ;;
     #
@@ -193,6 +200,7 @@ while getopts ':s:c:e:m:p:x:d:b:znhv-' opt; do
     'd') disable+=("$(trim "${OPTARG,,} ")") ;;
     #
     'b') (( randLength = "${OPTARG}" )) ;;
+    't') (( timeout = "${OPTARG}" )) ;;
     #
     'z') terminator="\0" ;;
     'n') terminator="\n" ;;
@@ -279,6 +287,11 @@ if (( randLength <= 0 )); then
 else
   (( randLength += 3 - ((randLength - 1) % 4) ))
   (( randLength /= 4 ))
+fi
+
+# check validity of '-t' argument
+if (( timeout <= 0 )); then
+  optionErrors+="${EXECNAME}: error -- TIMEOUT must be non-negative"
 fi
 
 # show message if invalid options found
@@ -386,11 +399,6 @@ done
 # patch up config file and start server
 echo -e "${redisRenameExpr}" | cat "${config}" - | "${server}" -  2> /dev/null 1>&2 &
 
-# timeout to wait for the server to spin up
-#
-# @var int
-(( timeout = 5 ))
-
 # waiting start time
 #
 # @var int
@@ -400,7 +408,8 @@ echo -e "${redisRenameExpr}" | cat "${config}" - | "${server}" -  2> /dev/null 1
 while ! ${cli} ${socketCmd} ${portCmd} ${passwordCmd} "${tPing}" 2> /dev/null 1>&2; do
   sleep 1
   if (( "$(printf "%(%s)T")" - waitStart > timeout )); then
-    break
+    echo "${EXECNAME}: error -- server timeout"
+    exit 2
   fi
 done
 
