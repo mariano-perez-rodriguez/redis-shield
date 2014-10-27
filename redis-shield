@@ -55,6 +55,11 @@ recognizing the '-p', '-s', and '-a' options for specifying port, socket,
 and authentication; additionally, it should support the '-x' switch
 instructing the script to read its last argument from stdin. Note that
 redis-cli fulfills the requirements.
+
+Exit status:
+ 0  if OK,
+ 1  if command line problems (eg. invalid pattern),
+ 2  if server timeout reached.
 "
 }
 
