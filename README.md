@@ -179,11 +179,13 @@ Suppose you have the following Lua script (`zset2set.lua`):
 ```lua
 --[[
 
-Time complexity: O(N + M) where N is the size of dest (might be 0), and M the size of source
+Time complexity: O(N + M) where N is the size of dest (might be 0),
+    and M the size of source
 Space complexity: O(M) where is the size of source
 
 Convert a ZSET into a SET of its members alone (ie. discard scores).
-Note that dest and source may be the same keys, this has the effect of removing scores from a ZSET.
+Note that dest and source may be the same keys, this has the effect of
+    removing scores from a ZSET.
 
 USAGE: ZSET2SET dest source
 
@@ -218,11 +220,13 @@ Now, lets choose a _pattern_. We can use whatever we want, but let's stick with 
 ```lua
 --[[
 
-Time complexity: O(N + M) where N is the size of dest (might be 0), and M the size of source
+Time complexity: O(N + M) where N is the size of dest (might be 0),
+    and M the size of source
 Space complexity: O(M) where is the size of source
 
 Convert a ZSET into a SET of its members alone (ie. discard scores).
-Note that dest and source may be the same keys, this has the effect of removing scores from a ZSET.
+Note that dest and source may be the same keys, this has the effect of
+    removing scores from a ZSET.
 
 USAGE: ZSET2SET dest source
 
