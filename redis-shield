@@ -301,7 +301,7 @@ fi
 
 # show message if invalid options found
 if [[ "${optionErrors}" != '' ]]; then
-  echo -ne "${optionErrors}Try '${EXECNAME} -h' for more information.\n"
+  echo -ne "${optionErrors}Try '${EXECNAME} -h' for more information.\n" >&2
   exit 1
 fi
 
@@ -413,7 +413,7 @@ echo -e "${redisRenameExpr}" | cat "${config}" - | "${server}" -  2> /dev/null 1
 while ! ${cli} ${socketCmd} ${portCmd} ${passwordCmd} "${tPing}" 2> /dev/null 1>&2; do
   sleep 1
   if (( "$(printf "%(%s)T")" - waitStart > timeout )); then
-    echo "${EXECNAME}: error -- server timeout"
+    echo "${EXECNAME}: error -- server timeout" >&2
     exit 2
   fi
 done
