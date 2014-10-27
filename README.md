@@ -274,12 +274,12 @@ Simple, right? :smile:
 
 ## Rationale
 
-Normally, an application (_your_ application) stands between Redis and the _big bad world_:registered:. But what if all security mechanisms fail and a malicious attacker gains access to the environment your application run on? It is under that attack scenario that `redis-shield` was designed: to provide a tool to ensure _consistency_, even in the face of an attack that strong. Note that it _consistency_ what is "secured", not the actual contents of the Redis dataset (Redis has no way of telling the attacker apart from your application).
+Normally, an application (_your_ application) stands between Redis and the _big bad world_ :registered:. But what if all security mechanisms fail and a malicious attacker gains access to the environment your application run on? It is under that attack scenario that `redis-shield` was designed: to provide a tool to ensure _consistency_, even in the face of an attack that strong. Note that is _consistency_ what is "secured", not the actual contents of the Redis dataset (Redis has no way of telling the attacker apart from your application).
 
 In a normal case, your application will surely have an abstraction layer acting as an interface towards Redis, in order to provide for a "domain specific language" of sorts, so that you can say something along the lines of (`PHP` code):
 
 ```php
-$user123 = Users::getById(123);
+$user123 = Users::get(123);
 $user123->lastLogin = time();
 $user123->store();
 ```
@@ -293,4 +293,4 @@ the former being more "high-levely" and, thus, closer to the application domain.
 
 What `redis-shield` does is basically provide you with the tools to implement something similar, but directly into Redis: you write the Lua scripts that act as interfaces to your data, and only allow calling them, thus only allowing modification through your (controlled) channels.
 
-Incidentally, if an attacker were to gain access to the Redis pipe (be it a socket or a TCP connection), he would be unable to break the consistency (as imposed by your scripts) of the dataset. Do note though, that he may very well do a plethora of awful things to your data anyway: `redis-shield` is just that, a _shield_, your dataset is shielded from consistency, not turned into [Sigurd](http://en.wikipedia.org/wiki/Sigurd).
+Incidentally, if an attacker were to gain access to the Redis pipe (be it a socket or a TCP connection), he would be unable to break the consistency (as imposed by your scripts) of the dataset. Do note though, that he may very well do a plethora of awful things to your data anyway: `redis-shield` is just that, a _shield_, your dataset is shielded from _inconsistency_, not turned into [Sigurd](http://en.wikipedia.org/wiki/Sigurd).
