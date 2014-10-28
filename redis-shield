@@ -298,7 +298,7 @@ done
 
 # check validity of '-b' argument, advance to next multiple of 4 if needed
 if (( randLength <= 0 )); then
-  optionErrors+="${EXECNAME}: error -- BITS must be non-negative"
+  optionErrors+="${EXECNAME}: error -- BITS must be non-negative\n"
 else
   (( randLength += 3 - ((randLength - 1) % 4) ))
   (( randLength /= 4 ))
@@ -306,7 +306,12 @@ fi
 
 # check validity of '-t' argument
 if (( timeout <= 0 )); then
-  optionErrors+="${EXECNAME}: error -- TIMEOUT must be non-negative"
+  optionErrors+="${EXECNAME}: error -- TIMEOUT must be non-negative\n"
+fi
+
+# check if there are remaining arguments
+if (( "$#" == 0 )); then
+  optionErrors+="${EXECNAME}: error -- nothing to be done\n"
 fi
 
 # show message if invalid options found
