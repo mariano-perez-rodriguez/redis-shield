@@ -39,6 +39,10 @@ Additional options:
   -o            don't try to guess 'redis.call' / 'redis.pcall' appearances,
                   use patterns only
 
+  -w            enable 'watch-only' mode: this will output the config
+                  directives to be injected and the replaced scripts
+  -r            disable 'watch only' mode, work for real
+
   --            signal the end of command line options
 
   -h            display this help and exit
@@ -171,6 +175,16 @@ $ redis-shield -s /opt/redis/redis-server
                *.lua
 ```
 
+Play voyeur and only watch what would happen:
+
+```
+$ redis-shield -s /opt/redis/redis-server
+               -c /opt/redis/redis.conf
+               -e /opt/redis/redis-cli
+               -w
+               *.lua
+```
+
 ## Description
 
 `redis-shield` is a Bash script intended to provide `EVALSHA`-only mode for Redis. `EVALSHA`-only mode means that the only command available to a Redis client is `EVALSHA`, this allows for setups where the system administrator or developer sets up a number of Lua scripts for execution on the Redis server prividing the _only_ channels by which the application is to access and modify data; think of it as the public interface of the Redis server in this case.
@@ -294,6 +308,8 @@ so that your application can make use of it using `EVALSHA`.
 Simple, right? :smile:
 
 Not so simple? No problem! Run `redis-shield` with the `-g` (ie. guess) option: it will find the occurrences for you _most of the time_ (as with every other tool, blindly relying on its results without checking them is doomed to failure).
+
+Squeamish still? Fret not! Running `redis-shield` with the `-w` (ie. watch) option will show you the `rename-command` directives to be injected in the config and the result of replacing Redis commands inside the scripts passed.
 
 ## Rationale
 
