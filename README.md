@@ -167,6 +167,14 @@ $ redis-shield -s /opt/redis/redis-server
 
 ### Requirements
 
+>> **NOTE** Starting from version 0.2, `redis-shield` is able to _guess_ some occurrences of `redis.call` and `redis.pcall`. Now (given the `-g` switch) `redis-shield` will look for patterns of the form:
+>>
+>> _W_ **redis** _S_ **.** _S_ _P_ **call** _S_ **(** _S_ _Q_ **_TOKEN_** _Q_ _S_ ,
+>>
+>> where _S_ stands for arbitrary whitespace, _W_ stands for a word boundary, _Q_ is either a single or double quote (both forms are allowed in Lua, `redis-shield` only looks for matching _Q_ s), and _P_ is an optional "P" / "p" (in order to catch `pcall` as well); **_TOKEN_** is any Redis command being looked for.
+>>
+>> This is the most "generous" regex that Lua would swallow without choking, but it may need further tuning.
+
 In order to make this happen, `redis-shield` requires you to adhere to a simple convention:
 
 > When calling Redis commands inside a Lua script (with `redis.call(...)`), instead of using the command's name (eg. '`SET`'), use a distinctive pattern (eg. '`__SET__`', the default one).
