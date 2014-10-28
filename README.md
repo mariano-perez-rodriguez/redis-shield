@@ -293,7 +293,7 @@ so that your application can make use of it using `EVALSHA`.
 
 Simple, right? :smile:
 
-Not so simple? No problem! run `redis-shield` with the `-g` (ie. guess) option: it will fill the occurrences for you _most of the time_ (as with every other tool, blindly relying on its results without checking them is doomed to failure).
+Not so simple? No problem! Run `redis-shield` with the `-g` (ie. guess) option: it will find the occurrences for you _most of the time_ (as with every other tool, blindly relying on its results without checking them is doomed to failure).
 
 ## Rationale
 
