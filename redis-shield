@@ -402,7 +402,7 @@ for token in "${tokens[@]}"; do
     sedRepExpr+="s/$(printf "${pattern}" "${token^^}")/${rand}/g;"
   else
     # build sed guessing replacement expression (case insensitive)
-    sedRepExpr+="s/\\bredis\\s*\\.(p)?call\\s*\\(\\s*(['\"])${token}(['\"])\\s*,/redis.\\1call(\\2${rand}\\3,/gI;"
+    sedRepExpr+="s/\\bredis\\s*\\.(p)?call\\s*\\(\\s*(['\"])${token}\\2\\s*,/redis.\\1call(\\2${rand}\\2,/gI;"
   fi
   # cache SCRIPT value
   if [[ "${token}" == 'script' ]]; then
