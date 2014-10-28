@@ -3,7 +3,7 @@
 # Current version
 #
 # @var string
-VERSION='0.2'
+VERSION='0.3'
 
 # Executable name
 #
@@ -44,6 +44,10 @@ Additional options:
   -g            try to guess 'redis.call' / 'redis.pcall' appearances
   -o            don't try to guess 'redis.call' / 'redis.pcall' appearances,
                   use patterns only
+
+  -w            enable 'watch-only' mode: this will output the config
+                  directives to be injected and the replaced scripts
+  -r            disable 'watch only' mode, work for real
 
   --            signal the end of command line options
 
@@ -186,7 +190,19 @@ disable=()
 (( timeout = 5 ))
 
 # whether to guess 'redis.call' / 'redis.pcall' appearances
+#
+# @var int
 (( guess = 0 ))
+
+# whether to only watch what would happen
+#
+# @var int
+(( watch = 0 ))
+
+# output of watch action
+#
+# @var int
+watchOut=''
 
 # Options errors string
 #
@@ -194,7 +210,7 @@ disable=()
 optionErrors=''
 
 # parse command line options
-while getopts ':s:c:e:m:p:x:d:b:t:zngohv-' opt; do
+while getopts ':s:c:e:m:p:x:d:b:t:zngowrhv-' opt; do
   case "${opt}" in
     '-') break ;;
     #
@@ -220,6 +236,9 @@ while getopts ':s:c:e:m:p:x:d:b:t:zngohv-' opt; do
     #
     'h') showHelp; exit 0;;
     'v') showVersion; exit 0;;
+    #
+    'w') (( watch = 1 )) ;;
+    'r') (( watch = 0 )) ;;
     #
     '?') optionErrors+="${EXECNAME}: ivalid option -- '${OPTARG}'\n" ;;
     ':') optionErrors+="${EXECNAME}: option '-${OPTARG}' requires an argument\n" ;;
@@ -421,22 +440,28 @@ for token in "${tokens[@]}"; do
   fi
 done
 
-# patch up config file and start server
-echo -e "${redisRenameExpr}" | cat "${config}" - | "${server}" -  2> /dev/null 1>&2 &
+# if watching, don't launch server
+if (( watch == 1 )); then
+  # add rename-command expressions to watch output
+  watchOut+="Redis 'rename-command' expressions:\n${redisRenameExpr}\n\n"
+else
+  # patch up config file and start server
+  echo -e "${redisRenameExpr}" | cat "${config}" - | "${server}" -  2> /dev/null 1>&2 &
 
-# waiting start time
-#
-# @var int
-(( waitStart = "$(printf "%(%s)T")" ))
+  # waiting start time
+  #
+  # @var int
+  (( waitStart = "$(printf "%(%s)T")" ))
 
-# wait for the server to come online
-while ! ${cli} ${socketCmd} ${portCmd} ${passwordCmd} "${tPing}" 2> /dev/null 1>&2; do
-  sleep 1
-  if (( "$(printf "%(%s)T")" - waitStart > timeout )); then
-    echo "${EXECNAME}: error -- server timeout" >&2
-    exit 2
-  fi
-done
+  # wait for the server to come online
+  while ! ${cli} ${socketCmd} ${portCmd} ${passwordCmd} "${tPing}" 2> /dev/null 1>&2; do
+    sleep 1
+    if (( "$(printf "%(%s)T")" - waitStart > timeout )); then
+      echo "${EXECNAME}: error -- server timeout" >&2
+      exit 2
+    fi
+  done
+fi
 
 # clean up script map file
 echo '' > "${scriptMap}"
@@ -448,6 +473,17 @@ for lua in "$@"; do
   else
     sedR=''
   fi
-  hash="$(sed ${sedR} -e "${sedRepExpr}" < "${lua}" | ${cli} ${socketCmd} ${portCmd} ${passwordCmd} -x "${tScript}" load)"
-  echo -ne "${hash} $(realpath -e ${lua})${terminator}" >> "${scriptMap}"
+  # apply replacements
+  replaced="$(sed ${sedR} -e "${sedRepExpr}" < "${lua}")"
+  if (( watch == 1 )); then
+    watchOut+="Replacing commands in file '${lua}', result:\n${replaced}\n\n"
+  else
+    hash="$(${cli} ${socketCmd} ${portCmd} ${passwordCmd} -x "${tScript}" load <<<"${replaced}")"
+    echo -ne "${hash} $(realpath -e ${lua})${terminator}" >> "${scriptMap}"
+  fi
 done
+
+# generate watch output if needed
+if (( watch == 1 )); then
+  echo -ne "${watchOut}"
+fi
