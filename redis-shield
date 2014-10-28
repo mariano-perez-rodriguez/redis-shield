@@ -264,6 +264,8 @@ if [[ "${scriptMap}" != '' ]]; then
   if [[ "${scriptMap}" == '' ]]; then
     optionErrors+="${EXECNAME}: error -- path to MAP-FILE doesn't exist\n"
   fi
+else
+  scriptMap='/dev/stdout'
 fi
 
 # check validity of '-p' argument
@@ -432,9 +434,7 @@ while ! ${cli} ${socketCmd} ${portCmd} ${passwordCmd} "${tPing}" 2> /dev/null 1>
 done
 
 # clean up script map file
-if [[ "${scriptMap}" != '' ]]; then
-  echo '' > "${scriptMap}"
-fi
+echo '' > "${scriptMap}"
 # iterate through each remaining argument
 for lua in "$@"; do
   # guessing requires '-r' switch for sed
@@ -444,9 +444,5 @@ for lua in "$@"; do
     sedR=''
   fi
   hash="$(sed ${sedR} -e "${sedRepExpr}" < "${lua}" | ${cli} ${socketCmd} ${portCmd} ${passwordCmd} -x "${tScript}" load)"
-  if [[ "${scriptMap}" != '' ]]; then
-    echo -ne "${hash} $(realpath -e ${lua})${terminator}" >> "${scriptMap}"
-  else
-    echo -ne "${hash} $(realpath -e ${lua})${terminator}"
-  fi
+  echo -ne "${hash} $(realpath -e ${lua})${terminator}" >> "${scriptMap}"
 done
