@@ -3,7 +3,7 @@
 # Current version
 #
 # @var string
-VERSION='0.1'
+VERSION='0.2'
 
 # Executable name
 #
@@ -41,6 +41,9 @@ Additional options:
                   multiple of 4), defaults to 1024
   -t TIMEOUT    time in seconds to wait for server availability (defaults
                   to 5)
+  -g            try to guess 'redis.call' / 'redis.pcall' appearances
+  -o            don't try to guess 'redis.call' / 'redis.pcall' appearances,
+                  use patterns only
 
   --            signal the end of command line options
 
@@ -182,6 +185,8 @@ disable=()
 # @var int
 (( timeout = 5 ))
 
+# whether to guess 'redis.call' / 'redis.pcall' appearances
+(( guess = 0 ))
 
 # Options errors string
 #
@@ -189,7 +194,7 @@ disable=()
 optionErrors=''
 
 # parse command line options
-while getopts ':s:c:e:m:p:x:d:b:t:znhv-' opt; do
+while getopts ':s:c:e:m:p:x:d:b:t:zngohv-' opt; do
   case "${opt}" in
     '-') break ;;
     #
@@ -209,6 +214,9 @@ while getopts ':s:c:e:m:p:x:d:b:t:znhv-' opt; do
     #
     'z') terminator="\0" ;;
     'n') terminator="\n" ;;
+    #
+    'g') (( guess = 1 )) ;;
+    'o') (( guess = 0 )) ;;
     #
     'h') showHelp; exit 0;;
     'v') showVersion; exit 0;;
@@ -389,8 +397,13 @@ for token in "${tokens[@]}"; do
     # excluded from renaming - keep name
     rand="${token}"
   fi
-  # build sed replacement expression
-  sedRepExpr+="s/$(printf "${pattern}" "${token^^}")/${rand}/g;"
+  if (( guess == 1 )); then
+    # build sed replacement expression
+    sedRepExpr+="s/$(printf "${pattern}" "${token^^}")/${rand}/g;"
+  else
+    # build sed guessing replacement expression (case insensitive)
+    sedRepExpr+="s/\\bredis\\s*\\.(p)?call\\s*\\(\\s*(['\"])${token}(['\"])\\s*,/redis.\\1call(\\2${rand}\\3,/gI;"
+  fi
   # cache SCRIPT value
   if [[ "${token}" == 'script' ]]; then
     tScript="${rand}"
@@ -424,7 +437,12 @@ if [[ "${scriptMap}" != '' ]]; then
 fi
 # iterate through each remaining argument
 for lua in "$@"; do
-  hash="$(sed -e "${sedRepExpr}" < "${lua}" | ${cli} ${socketCmd} ${portCmd} ${passwordCmd} -x "${tScript}" load)"
+  # guessing requires '-r' switch for sed
+  if (( guess == 1 )); then
+    hash="$(sed -re "${sedRepExpr}" < "${lua}" | ${cli} ${socketCmd} ${portCmd} ${passwordCmd} -x "${tScript}" load)"
+  else
+    hash="$(sed -e "${sedRepExpr}" < "${lua}" | ${cli} ${socketCmd} ${portCmd} ${passwordCmd} -x "${tScript}" load)"
+  fi
   if [[ "${scriptMap}" != '' ]]; then
     echo -ne "${hash} $(realpath -e ${lua})${terminator}" >> "${scriptMap}"
   else

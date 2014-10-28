@@ -35,6 +35,9 @@ Additional options:
                   multiple of 4), defaults to 1024
   -t TIMEOUT    time in seconds to wait for server availability (defaults
                   to 5)
+  -g            try to guess 'redis.call' / 'redis.pcall' appearances
+  -o            don't try to guess 'redis.call' / 'redis.pcall' appearances,
+                  use patterns only
 
   --            signal the end of command line options
 
