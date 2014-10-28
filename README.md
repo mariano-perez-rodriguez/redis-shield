@@ -293,6 +293,8 @@ so that your application can make use of it using `EVALSHA`.
 
 Simple, right? :smile:
 
+Not so simple? No problem! run `redis-shield` with the `-g` (ie. guess) option: it will fill the occurrences for you _most of the time_ (as with every other tool, blindly relying on its results without checking them is doomed to failure).
+
 ## Rationale
 
 Normally, an application (_your_ application) stands between Redis and the _big bad world_ :registered:. But what if all security mechanisms fail and a malicious attacker gains access to the environment your application run on? It is under that attack scenario that `redis-shield` was designed: to provide a tool to ensure _consistency_, even in the face of an attack that strong. Note that is _consistency_ what is "secured", not the actual contents of the Redis dataset (Redis has no way of telling the attacker apart from your application).
