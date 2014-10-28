@@ -439,10 +439,11 @@ fi
 for lua in "$@"; do
   # guessing requires '-r' switch for sed
   if (( guess == 1 )); then
-    hash="$(sed -re "${sedRepExpr}" < "${lua}" | ${cli} ${socketCmd} ${portCmd} ${passwordCmd} -x "${tScript}" load)"
+    sedR='-r'
   else
-    hash="$(sed -e "${sedRepExpr}" < "${lua}" | ${cli} ${socketCmd} ${portCmd} ${passwordCmd} -x "${tScript}" load)"
+    sedR=''
   fi
+  hash="$(sed ${sedR} -e "${sedRepExpr}" < "${lua}" | ${cli} ${socketCmd} ${portCmd} ${passwordCmd} -x "${tScript}" load)"
   if [[ "${scriptMap}" != '' ]]; then
     echo -ne "${hash} $(realpath -e ${lua})${terminator}" >> "${scriptMap}"
   else
