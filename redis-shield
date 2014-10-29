@@ -405,7 +405,7 @@ sedRepExpr=''
 # Redis config rename-command expressions
 #
 # @var string
-redisRenameExpr="\n\n# ----------------------------------------------\n# --- Added by ${EXECNAME} v${VERSION} ---------\n# ----------------------------------------------\n\n"
+redisRenameExpr="\n\n# ----------------------------------------------\n# -- Added by ${EXECNAME} v${VERSION}\n# ----------------------------------------------\n\n"
 
 # build command renaming expressions
 for token in "${tokens[@]}"; do
