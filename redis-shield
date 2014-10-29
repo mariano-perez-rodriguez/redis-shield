@@ -342,20 +342,20 @@ fi
 # Redis' port, as per config
 #
 # @var int
-port="$(trim "$(grep -ioe'^[[:space:]]*port[[:space:]]\+[[:digit:]]\+[[:space:]]*$' "${config}")" | cut -d\  -f2)"
+port="$(trim "$(LC_ALL=C grep -ioe'^[[:space:]]*port[[:space:]]\+[[:digit:]]\+[[:space:]]*$' "${config}")" | cut -d\  -f2)"
 port="$(trim "${port#port}")"
 (( port = port ))
 
 # Redis' socket, as per config
 #
 # @var string
-socket="$(trim "$(grep -ioe'^[[:space:]]*unixsocket[[:space:]]\+[[:graph:]]\+[[:space:]]*$' "${config}")" | cut -d\  -f2)"
+socket="$(trim "$(LC_ALL=C grep -ioe'^[[:space:]]*unixsocket[[:space:]]\+[[:graph:]]\+[[:space:]]*$' "${config}")" | cut -d\  -f2)"
 socket="$(trim "${socket#unixsocket}")"
 
 # Redis' password, as per config
 #
 # @var string
-password="$(trim "$(grep -ioe'^[[:space:]]*requirepass[[:space:]]\+[[:graph:]]\+[[:space:]]*$' "${config}")" | cut -d\  -f2-)"
+password="$(trim "$(LC_ALL=C grep -ioe'^[[:space:]]*requirepass[[:space:]]\+[[:graph:]]\+[[:space:]]*$' "${config}")" | cut -d\  -f2-)"
 password="$(trim "${password#requirepass}")"
 
 
@@ -474,7 +474,7 @@ for lua in "$@"; do
     sedR=''
   fi
   # apply replacements
-  replaced="$(sed ${sedR} -e "${sedRepExpr}" < "${lua}")"
+  replaced="$(LC_ALL=C sed ${sedR} -e "${sedRepExpr}" < "${lua}")"
   if (( watch == 1 )); then
     watchOut+="Replacing commands in file '${lua}', result:\n${replaced}\n\n"
   else
