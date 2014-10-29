@@ -425,7 +425,7 @@ for token in "${tokens[@]}"; do
   fi
   if (( guess == 1 )); then
     # build sed guessing replacement expression (case insensitive)
-    sedRepExpr+="s/\\bredis\\s*\\.\\s*(p)?call\\s*\\(\\s*(['\"])${token}\\2\\s*,/redis.\\1call(\\2${rand}\\2,/gi;"
+    sedRepExpr+="s/\\<redis[[:space:]]*\\.[[:space:]]*(p)?call[[:space:]]*\\([[:space:]]*(['\"])${token}\\2[[:space:]]*,/redis.\\1call(\\2${rand}\\2,/gi;"
   else
     # build sed replacement expression
     sedRepExpr+="s/$(printf "${pattern}" "${token^^}")/${rand}/g;"
