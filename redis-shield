@@ -448,15 +448,15 @@ else
   # patch up config file and start server
   echo -e "${redisRenameExpr}" | cat "${config}" - | "${server}" -  2> /dev/null 1>&2 &
 
-  # waiting start time
+  # waiting end time
   #
   # @var int
-  (( waitStart = "$(printf "%(%s)T")" ))
+  (( waitEnd = "$(printf "%(%s)T")" + timeout ))
 
   # wait for the server to come online
   while ! ${cli} ${socketCmd} ${portCmd} ${passwordCmd} "${tPing}" 2> /dev/null 1>&2; do
     sleep 1
-    if (( "$(printf "%(%s)T")" - waitStart > timeout )); then
+    if (( "$(printf "%(%s)T")" > waitEnd )); then
       echo "${EXECNAME}: error -- server timeout" >&2
       exit 2
     fi
