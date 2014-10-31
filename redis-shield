@@ -22,7 +22,7 @@ space separated hash / FILE pairs.
 Mandatory options:
   -s SERVER-SCRIPT   use the given script as the server
   -c CONFIG          use the given file as base configuration
-  -e CLI-SCRIPT      use the given script as the cli interface
+  -e CLI-SCRIPT      use the given script as the cli client
 
 Additional options:
   -m MAP-FILE   write the hash / FILE mapping to the given file

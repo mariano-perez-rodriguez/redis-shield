@@ -16,7 +16,7 @@ space separated hash / FILE pairs.
 Mandatory options:
   -s SERVER-SCRIPT   use the given script as the server
   -c CONFIG          use the given file as base configuration
-  -e CLI-SCRIPT      use the given script as the cli interface
+  -e CLI-SCRIPT      use the given script as the cli client
 
 Additional options:
   -m MAP-FILE   write the hash / FILE mapping to the given file
@@ -187,7 +187,7 @@ $ redis-shield -s /opt/redis/redis-server
 
 ## Description
 
-`redis-shield` is a Bash script intended to provide `EVALSHA`-only mode for Redis. `EVALSHA`-only mode means that the only command available to a Redis client is `EVALSHA`, this allows for setups where the system administrator or developer sets up a number of Lua scripts for execution on the Redis server prividing the _only_ channels by which the application is to access and modify data; think of it as the public interface of the Redis server in this case.
+`redis-shield` is a Bash script intended to provide `EVALSHA`-only mode for Redis. `EVALSHA`-only mode means that the only command available to a Redis client is `EVALSHA`, this allows for setups where the system administrator or developer sets up a number of Lua scripts for execution on the Redis server providing the _only_ channels by which the application is to access and modify data; think of it as the public interface of the Redis server in this case.
 
 ### Requirements
 
